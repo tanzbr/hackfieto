@@ -9,7 +9,7 @@ interface SearchBarProps {
   placeholder?: string
 }
 
-export function SearchBar({ obras, placeholder = "Buscar obras por nome, localização ou ID..." }: SearchBarProps) {
+export function SearchBar({ obras, placeholder = "Buscar obras por nome e localização..." }: SearchBarProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [isOpen, setIsOpen] = useState(false)
   const [recentSearches, setRecentSearches] = useState<string[]>([])
@@ -168,7 +168,7 @@ export function SearchBar({ obras, placeholder = "Buscar obras por nome, localiz
                 </div>
               )}
               <div className="px-4 py-3 border-t border-gray-200 text-xs text-gray-500">
-                Digite para buscar obras por nome, localização ou ID
+                Digite para buscar obras por nome e localização
               </div>
             </>
           )}

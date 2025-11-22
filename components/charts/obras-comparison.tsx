@@ -8,7 +8,7 @@ interface ObrasComparisonProps {
   title?: string
 }
 
-export function ObrasComparison({ obras, title = "Comparação entre Obras" }: ObrasComparisonProps) {
+export function ObrasComparison({ obras, title = "Níveis de Integridade por Obra" }: ObrasComparisonProps) {
   const data = obras.map(obra => ({
     name: obra.name.length > 25 ? obra.name.substring(0, 25) + '...' : obra.name,
     fullName: obra.name,
@@ -42,7 +42,7 @@ export function ObrasComparison({ obras, title = "Comparação entre Obras" }: O
             style={{ fontSize: '12px' }}
             domain={[0, 100]}
             ticks={[0, 25, 50, 75, 100]}
-            label={{ value: 'Integridade (%)', angle: -90, position: 'insideLeft', style: { fontSize: '12px', fill: '#6b7280' } }}
+            label={{ value: 'Integridade (%)', angle: -90, position: 'insideLeft', style: { fontSize: '12px', fill: '#6b7280', textAnchor: 'middle' } }}
           />
           <Tooltip 
             contentStyle={{

@@ -1,12 +1,12 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import Link from "next/link"
+import { useRouter } from "next/navigation"
 import type { Obra } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
 import { SearchBar } from "./search-bar"
 import { Tooltip } from "./ui/tooltip"
-import { QuickActionsMenu } from "./quick-actions-menu"
+
 
 type SortOption = "name" | "integrity-desc" | "integrity-asc" | "location" | "recent"
 
@@ -15,11 +15,12 @@ interface DashboardHeroProps {
 }
 
 export function DashboardHero({ obras }: DashboardHeroProps) {
+  const router = useRouter()
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "warning" | "critical">("all")
   const [sortBy, setSortBy] = useState<SortOption>("recent")
 
   // Cálculo de métricas (usando obras originais)
-  const obrasAtivas = obras.filter(o => o.status === "active").length
+  const obrasAtivas = obras.length
   const totalBlocos = obras.length * 400
   const alertasPendentes = obras.filter(o => o.status === "warning" || o.status === "critical").length
   const taxaEficiencia = Math.round(obras.reduce((acc, o) => acc + o.integrity, 0) / obras.length)
@@ -59,9 +60,6 @@ export function DashboardHero({ obras }: DashboardHeroProps) {
       {/* Header Section */}
       <div className="flex items-center justify-between">
         <div className="space-y-1">
-          <h1 className="text-3xl font-semibold text-gray-900 tracking-tight">
-            Visão Geral
-          </h1>
           <p className="text-sm text-gray-500">
             Monitoramento em tempo real das suas obras
           </p>
@@ -153,7 +151,7 @@ export function DashboardHero({ obras }: DashboardHeroProps) {
       </div>
 
       {/* Lista de Obras com Filtros */}
-      <div className="bg-white border border-gray-200 rounded-lg">
+      <div id="obras-recentes" className="bg-white border border-gray-200 rounded-lg scroll-mt-24">
         {/* Header com Filtros e Ordenação */}
         <div className="border-b border-gray-200 px-6 py-4">
           <div className="flex items-center justify-between">
@@ -229,10 +227,10 @@ export function DashboardHero({ obras }: DashboardHeroProps) {
         {/* Lista */}
         <div className="divide-y divide-gray-200">
           {obrasFiltradas.map((obra, index) => (
-            <Link
+            <div
               key={obra.id}
-              href={`/obras/${obra.id}`}
-              className="block px-6 py-4 hover:bg-gray-50 transition-all-smooth hover-lift"
+              onClick={() => router.push(`/obras/${obra.id}`)}
+              className="block px-6 py-4 hover:bg-gray-50 transition-all-smooth hover-lift cursor-pointer"
               style={{ animationDelay: `${index * 50}ms` }}
             >
               <div className="flex items-center justify-between">
@@ -278,14 +276,14 @@ export function DashboardHero({ obras }: DashboardHeroProps) {
                     />
                   </div>
                   
-                  <QuickActionsMenu obra={obra} />
+
                   
                   <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </div>
               </div>
-            </Link>
+            </div>
           ))}
         </div>
       </div>
