@@ -3,30 +3,45 @@ import { DashboardHero } from "@/components/dashboard-hero"
 import { AppHeader } from "@/components/app-header"
 import { ObrasComparison } from "@/components/charts/obras-comparison"
 import { ObraComparison } from "@/components/obra-comparison"
+import { AppSidebar } from "@/components/app-sidebar"
+import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 
 export default function ObrasPage() {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <AppHeader />
-
-      <main className="max-w-7xl mx-auto px-6 py-8 space-y-8">
-        <DashboardHero obras={mockObras} />
+    <SidebarProvider defaultOpen={true}>
+      <div className="flex min-h-screen w-full">
+        <AppSidebar />
         
-        {/* Gráfico de comparação */}
-        <ObrasComparison obras={mockObras} />
+        <SidebarInset className="flex-1">
+          <div className="min-h-screen bg-gray-50 flex flex-col">
+            <AppHeader />
+            
+            {/* Trigger do Sidebar para Mobile */}
+            <div className="md:hidden px-4 py-2 bg-white border-b border-gray-200">
+              <SidebarTrigger />
+            </div>
 
-        {/* Comparador interativo de obras */}
-        <ObraComparison obras={mockObras} />
-      </main>
+            <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-8 space-y-8">
+              <DashboardHero obras={mockObras} />
+              
+              {/* Gráfico de comparação */}
+              <ObrasComparison obras={mockObras} />
 
-      <footer className="bg-white border-t border-gray-200 mt-16">
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          <div className="text-center text-sm text-gray-500">
-            <p>Nexfloor - Desafio Industrial FIETO</p>
-            <p className="mt-1">Economia Circular na Construção Civil - Tocantins</p>
+              {/* Comparador interativo de obras */}
+              <ObraComparison obras={mockObras} />
+            </main>
+
+            <footer className="bg-white border-t border-gray-200 mt-16">
+              <div className="max-w-7xl mx-auto px-6 py-8">
+                <div className="text-center text-sm text-gray-500">
+                  <p>Nexfloor - Desafio Industrial FIETO</p>
+                  <p className="mt-1">Economia Circular na Construção Civil - Tocantins</p>
+                </div>
+              </div>
+            </footer>
           </div>
-        </div>
-      </footer>
-    </div>
+        </SidebarInset>
+      </div>
+    </SidebarProvider>
   )
 }
