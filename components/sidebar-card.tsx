@@ -89,16 +89,8 @@ export function BlockInfo({ block }: BlockInfoProps) {
         <span className="text-sm text-gray-600">Status:</span>
         <p className="text-base font-medium text-gray-900">{status}</p>
       </div>
-      <div>
-        <span className="text-sm text-gray-600">Indicador de Cor:</span>
-        <div className="flex items-center gap-3 mt-2">
-          <div className="w-12 h-12 rounded border-2 border-gray-300" style={{ backgroundColor: color }} />
-          <span className="text-sm text-gray-600">{status}</span>
-        </div>
-      </div>
-      <div className="pt-4 border-t border-gray-200">
-        <span className="text-xs text-gray-500">Sensores: Piezoelétrico + Giroscópio</span>
-      </div>
+
+
     </div>
   )
 }
