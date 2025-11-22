@@ -37,8 +37,8 @@ const menuItems = {
       icon: Building2,
     },
     {
-      title: "Relatórios",
-      url: "#",
+      title: "Estatísticas",
+      url: "/estatisticas",
       hash: "",
       icon: BarChart3,
     },
