@@ -1,4 +1,7 @@
+"use client"
+
 import type React from "react"
+import { useState, useEffect } from "react"
 import { type Block, getBlockStatus, getBlockColor } from "@/lib/mock-data"
 
 interface SidebarCardProps {
@@ -24,6 +27,12 @@ interface WorkInfoProps {
 }
 
 export function WorkInfo({ name, id, integrity, location, lastUpdate }: WorkInfoProps) {
+  const [formattedDate, setFormattedDate] = useState<string>("")
+  
+  useEffect(() => {
+    setFormattedDate(new Date(lastUpdate).toLocaleDateString("pt-BR"))
+  }, [lastUpdate])
+  
   return (
     <div className="space-y-3">
       <div>
@@ -44,7 +53,9 @@ export function WorkInfo({ name, id, integrity, location, lastUpdate }: WorkInfo
       </div>
       <div>
         <span className="text-sm text-gray-600">Última Atualização:</span>
-        <p className="text-base font-medium text-gray-900">{new Date(lastUpdate).toLocaleDateString("pt-BR")}</p>
+        <p className="text-base font-medium text-gray-900">
+          {formattedDate || "Carregando..."}
+        </p>
       </div>
     </div>
   )

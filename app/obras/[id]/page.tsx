@@ -92,18 +92,19 @@ export default function ObraDetailPage({ params }: { params: Promise<{ id: strin
                   <BlockGrid3D blocks={blocks} onBlockSelect={setSelectedBlock} selectedBlock={selectedBlock} />
                 </div>
                 <div className="p-4 border-t border-gray-200 bg-gray-50">
-                  <div className="flex items-center justify-center gap-8 text-sm">
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded bg-white border border-gray-300" />
-                      <span className="text-gray-600">Bom (≥70%)</span>
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-gray-500">
+                      Clique em um bloco para visualizar informações de integridade
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded bg-yellow-500" />
-                      <span className="text-gray-600">Alerta (40-69%)</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded bg-red-500" />
-                      <span className="text-gray-600">Crítico ({"<"}40%)</span>
+                    <div className="flex items-center gap-6">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-3 bg-yellow-500 rounded shadow-sm"></div>
+                        <span className="text-xs font-medium text-gray-700">Alerta (40-69%)</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-3 bg-red-500 rounded shadow-sm animate-pulse"></div>
+                        <span className="text-xs font-medium text-gray-700">Crítico (&lt;40%)</span>
+                      </div>
                     </div>
                   </div>
                 </div>

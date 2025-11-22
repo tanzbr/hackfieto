@@ -44,7 +44,7 @@ export interface Event {
 }
 
 // Gera uma grade de blocos com integridades aleatórias
-export function generateBlockGrid(size = 20): Block[] {
+export function generateBlockGrid(size = 10): Block[] {
   const blocks: Block[] = []
 
   for (let x = 0; x < size; x++) {
@@ -62,9 +62,14 @@ export function generateBlockGrid(size = 20): Block[] {
 
 // Retorna cor baseada na integridade
 export function getBlockColor(integrity: number): string {
-  if (integrity >= 70) return "#ffffff" // branco - bom
-  if (integrity >= 40) return "#fbbf24" // amarelo - alerta
-  return "#ef4444" // vermelho - crítico
+  return "#ffffff" // branco - todos os blocos são brancos
+}
+
+// Retorna cor do círculo de integridade baseado na integridade
+export function getIntegrityCircleColor(integrity: number): number {
+  if (integrity >= 70) return 0x22c55e // verde - bom
+  if (integrity >= 40) return 0xf59e0b // amarelo - alerta
+  return 0xdc2626 // vermelho - crítico
 }
 
 export function getBlockStatus(integrity: number): string {
@@ -86,7 +91,7 @@ export const mockObras: Obra[] = [
     year: 2023,
     type: "Galpão Industrial",
     responsavel: "Carlos Mendes",
-    totalBlocos: 400,
+    totalBlocos: 100,
   },
   {
     id: "2",
@@ -99,7 +104,7 @@ export const mockObras: Obra[] = [
     year: 2022,
     type: "Centro de Distribuição",
     responsavel: "Ana Paula Silva",
-    totalBlocos: 400,
+    totalBlocos: 100,
   },
   {
     id: "3",
@@ -112,7 +117,7 @@ export const mockObras: Obra[] = [
     year: 2021,
     type: "Fábrica",
     responsavel: "Roberto Costa",
-    totalBlocos: 400,
+    totalBlocos: 100,
   },
   {
     id: "4",
@@ -125,7 +130,7 @@ export const mockObras: Obra[] = [
     year: 2024,
     type: "Armazém",
     responsavel: "Marina Oliveira",
-    totalBlocos: 400,
+    totalBlocos: 100,
   },
   {
     id: "5",
@@ -138,31 +143,44 @@ export const mockObras: Obra[] = [
     year: 2024,
     type: "Complexo Industrial",
     responsavel: "Fernando Santos",
-    totalBlocos: 400,
+    totalBlocos: 100,
   },
 ]
 
 // Cache de grids por obra
 const blockGridCache: { [key: string]: Block[] } = {}
+const integrityHistoryCache: { [key: string]: IntegrityHistoryPoint[] } = {}
 
 export function getBlocksForObra(obraId: string): Block[] {
   if (!blockGridCache[obraId]) {
-    blockGridCache[obraId] = generateBlockGrid(20)
+    blockGridCache[obraId] = generateBlockGrid(10)
   }
   return blockGridCache[obraId]
 }
 
 // Gera histórico de integridade para os últimos 30 dias
-export function generateIntegrityHistory(currentIntegrity: number): IntegrityHistoryPoint[] {
+export function generateIntegrityHistory(currentIntegrity: number, seed: string = '0'): IntegrityHistoryPoint[] {
   const history: IntegrityHistoryPoint[] = []
-  const today = new Date()
+  // Usar uma data fixa para evitar diferenças entre servidor e cliente
+  const baseDate = new Date('2025-01-22')
+  
+  // Criar um gerador de números pseudo-aleatórios baseado em seed para consistência
+  let seedValue = 0
+  for (let i = 0; i < seed.length; i++) {
+    seedValue += seed.charCodeAt(i)
+  }
+  
+  const seededRandom = (index: number) => {
+    const x = Math.sin(seedValue + index) * 10000
+    return x - Math.floor(x)
+  }
   
   for (let i = 29; i >= 0; i--) {
-    const date = new Date(today)
+    const date = new Date(baseDate)
     date.setDate(date.getDate() - i)
     
-    // Adiciona variação aleatória mas mantém tendência
-    const variation = (Math.random() - 0.5) * 10
+    // Adiciona variação pseudo-aleatória mas mantém tendência
+    const variation = (seededRandom(i) - 0.5) * 10
     const integrity = Math.max(0, Math.min(100, currentIntegrity + variation - (i * 0.2)))
     
     history.push({
@@ -282,9 +300,12 @@ export const mockEvents: Event[] = [
 ]
 
 export function getIntegrityHistoryForObra(obraId: string): IntegrityHistoryPoint[] {
-  const obra = mockObras.find(o => o.id === obraId)
-  if (!obra) return []
-  return generateIntegrityHistory(obra.integrity)
+  if (!integrityHistoryCache[obraId]) {
+    const obra = mockObras.find(o => o.id === obraId)
+    if (!obra) return []
+    integrityHistoryCache[obraId] = generateIntegrityHistory(obra.integrity, obraId)
+  }
+  return integrityHistoryCache[obraId]
 }
 
 export function getNotificationsForObra(obraId: string): Notification[] {
