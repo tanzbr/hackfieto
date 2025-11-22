@@ -1,11 +1,17 @@
 "use client"
 
 import { useState, use } from "react"
-import { mockObras, getBlocksForObra, type Block } from "@/lib/mock-data"
+import { mockObras, getBlocksForObra, getIntegrityHistoryForObra, type Block } from "@/lib/mock-data"
 import { BlockGrid3D } from "@/components/block-grid-3d"
 import { SidebarCard, WorkInfo, BlockInfo } from "@/components/sidebar-card"
-import Link from "next/link"
+import { AppHeader } from "@/components/app-header"
+import { IntegrityTimeline } from "@/components/charts/integrity-timeline"
+import { StatusDistribution } from "@/components/charts/status-distribution"
+import { Heatmap } from "@/components/charts/heatmap"
+import { ExportButton } from "@/components/export-button"
+import { QuickActionsMenu } from "@/components/quick-actions-menu"
 import { notFound } from "next/navigation"
+import Link from "next/link"
 
 export default function ObraDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const [selectedBlock, setSelectedBlock] = useState<Block | null>(null)
@@ -18,86 +24,118 @@ export default function ObraDetailPage({ params }: { params: Promise<{ id: strin
   }
 
   const blocks = getBlocksForObra(obra.id)
+  const history = getIntegrityHistoryForObra(obra.id)
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+      <AppHeader />
+
+      <main className="flex-1 overflow-hidden">
+        <div className="max-w-[1800px] mx-auto px-16 py-6 space-y-6">
+          {/* Breadcrumbs e ações */}
           <div className="flex items-center justify-between">
-            <Link href="/obras" className="text-2xl font-bold text-gray-900">
-              EcoBlock Monitor
-            </Link>
-            
-            <nav className="flex gap-6">
-              <Link href="/obras" className="text-sm font-medium text-gray-900 hover:text-gray-600">
-                Minhas Obras
+            <nav className="flex items-center gap-2 text-sm">
+              <Link href="/obras" className="text-gray-500 hover:text-gray-700">
+                Obras
               </Link>
-              <a href="#" className="text-sm font-medium text-gray-600 hover:text-gray-900">
-                Relatórios
-              </a>
-              <a href="#" className="text-sm font-medium text-gray-600 hover:text-gray-900">
-                Configurações
-              </a>
+              <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+              <span className="text-gray-900 font-medium">{obra.name}</span>
             </nav>
-            
             <div className="flex items-center gap-3">
-              <div className="text-right">
-                <div className="text-sm font-medium text-gray-900">João Silva</div>
-                <div className="text-xs text-gray-500">Engenheiro Civil</div>
-              </div>
-              <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-medium">
-                JS
-              </div>
+              <QuickActionsMenu obra={obra} blocks={blocks} history={history} />
+              <ExportButton obra={obra} blocks={blocks} history={history} variant="single" />
             </div>
           </div>
-        </div>
-      </header>
 
-      <main className="flex-1 flex overflow-hidden">
-        {/* Visualização 3D */}
-        <div className="flex-1 p-6">
-          <div className="bg-white rounded-lg border border-gray-200 h-full flex flex-col">
-            <div className="p-4 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900">{obra.name}</h2>
-              <p className="text-sm text-gray-600 mt-1">Visualização 3D dos blocos inteligentes</p>
-            </div>
-            <div className="flex-1 relative">
-              <BlockGrid3D blocks={blocks} onBlockSelect={setSelectedBlock} selectedBlock={selectedBlock} />
-            </div>
-            <div className="p-4 border-t border-gray-200 bg-gray-50">
-              <div className="flex items-center justify-center gap-8 text-sm">
+          {/* Cabeçalho da Obra */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h1 className="text-2xl font-bold text-gray-900">{obra.name}</h1>
+            <div className="flex items-center gap-6 mt-3 text-sm text-gray-600">
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <span>{obra.location}</span>
+              </div>
+              {obra.area && (
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded bg-white border border-gray-300" />
-                  <span className="text-gray-600">Bom (≥70%)</span>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-3zM14 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1h-4a1 1 0 01-1-1v-3z" />
+                  </svg>
+                  <span>{obra.area} m²</span>
                 </div>
+              )}
+              {obra.responsavel && (
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded bg-yellow-500" />
-                  <span className="text-gray-600">Alerta (40-69%)</span>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  <span>{obra.responsavel}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded bg-red-500" />
-                  <span className="text-gray-600">Crítico ({"<"}40%)</span>
+              )}
+            </div>
+          </div>
+
+          {/* Visualizações 3D e 2D */}
+          <div className="grid grid-cols-3 gap-6">
+            {/* Visualização 3D */}
+            <div className="col-span-2">
+              <div className="bg-white rounded-lg border border-gray-200 h-[600px] flex flex-col">
+                <div className="p-4 border-b border-gray-200">
+                  <h2 className="text-lg font-semibold text-gray-900">Visualização 3D</h2>
+                  <p className="text-sm text-gray-600 mt-1">Clique em um bloco para ver detalhes</p>
+                </div>
+                <div className="flex-1 relative overflow-hidden">
+                  <BlockGrid3D blocks={blocks} onBlockSelect={setSelectedBlock} selectedBlock={selectedBlock} />
+                </div>
+                <div className="p-4 border-t border-gray-200 bg-gray-50">
+                  <div className="flex items-center justify-center gap-8 text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded bg-white border border-gray-300" />
+                      <span className="text-gray-600">Bom (≥70%)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded bg-yellow-500" />
+                      <span className="text-gray-600">Alerta (40-69%)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded bg-red-500" />
+                      <span className="text-gray-600">Crítico ({"<"}40%)</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
+
+            {/* Sidebar com Cards */}
+            <div className="space-y-6">
+              <SidebarCard title="Informações da Obra">
+                <WorkInfo
+                  name={obra.name}
+                  id={obra.id}
+                  integrity={obra.integrity}
+                  location={obra.location}
+                  lastUpdate={obra.lastUpdate}
+                />
+              </SidebarCard>
+
+              <SidebarCard title="Bloco Selecionado">
+                <BlockInfo block={selectedBlock} />
+              </SidebarCard>
+            </div>
           </div>
-        </div>
 
-        {/* Sidebar com Cards */}
-        <div className="w-96 bg-gray-50 p-6 overflow-y-auto space-y-6">
-          <SidebarCard title="Informações da Obra">
-            <WorkInfo
-              name={obra.name}
-              id={obra.id}
-              integrity={obra.integrity}
-              location={obra.location}
-              lastUpdate={obra.lastUpdate}
-            />
-          </SidebarCard>
+          {/* Grid de Gráficos */}
+          <div className="grid grid-cols-2 gap-6">
+            <IntegrityTimeline data={history} />
+            <StatusDistribution blocks={blocks} />
+          </div>
 
-          <SidebarCard title="Bloco Selecionado">
-            <BlockInfo block={selectedBlock} />
-          </SidebarCard>
+          {/* Mapa de Calor */}
+          <Heatmap blocks={blocks} />
         </div>
       </main>
     </div>
