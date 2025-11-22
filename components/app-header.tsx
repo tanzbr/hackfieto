@@ -7,7 +7,11 @@ import { getUnreadNotificationsCount } from "@/lib/mock-data"
 import { websocketMock } from "@/lib/websocket-mock"
 import toast from "react-hot-toast"
 
-export function AppHeader() {
+interface AppHeaderProps {
+  title?: string
+}
+
+export function AppHeader({ title = "Visão Geral" }: AppHeaderProps = {}) {
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(getUnreadNotificationsCount())
 
@@ -61,7 +65,7 @@ export function AppHeader() {
       <div className="w-full px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="text-3xl font-semibold text-gray-900">
-            Visão Geral
+            {title}
           </div>
           
           <div className="flex items-center gap-3">

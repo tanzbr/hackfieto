@@ -25,7 +25,7 @@ import {
 const menuItems = {
   principal: [
     {
-      title: "Visão Geral",
+      title: "Página Inicial",
       url: "/obras",
       hash: "",
       icon: LayoutGrid,
@@ -73,6 +73,20 @@ export function AppSidebar() {
   }, [])
 
   const handleMenuClick = (e: React.MouseEvent, item: typeof menuItems.principal[0]) => {
+    // Se estamos em uma sub-rota (ex: /obras/[id]), permite navegação normal para qualquer link
+    const isInSubRoute = pathname.startsWith('/obras/') && pathname !== '/obras'
+    
+    if (isInSubRoute) {
+      // Deixa o Next.js Link fazer a navegação normalmente
+      return
+    }
+    
+    // Se a URL de destino é diferente da página atual, permite navegação normal
+    if (pathname !== item.url && item.url !== "#") {
+      // Deixa o Next.js Link fazer a navegação normalmente
+      return
+    }
+    
     if (item.hash && item.url !== "#") {
       e.preventDefault()
       
@@ -87,8 +101,8 @@ export function AppSidebar() {
       if (element) {
         element.scrollIntoView({ behavior: "smooth", block: "start" })
       }
-    } else if (!item.hash && item.url === "/obras") {
-      // Se for visão geral, scroll para o topo
+    } else if (!item.hash && item.url === "/obras" && pathname === "/obras") {
+      // Se for página inicial e já estamos nela, scroll para o topo
       e.preventDefault()
       window.history.pushState(null, "", item.url)
       setActiveSection("")

@@ -28,7 +28,7 @@ export default function ObraDetailPage({ params }: { params: Promise<{ id: strin
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <AppHeader />
+      <AppHeader title="Detalhes da Obra" />
 
       <main className="flex-1 overflow-hidden">
         <div className="max-w-[1800px] mx-auto px-16 py-6 space-y-6">
