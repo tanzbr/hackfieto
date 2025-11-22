@@ -17,12 +17,24 @@ export function BlockGrid3D({ blocks, onBlockSelect, selectedBlock }: BlockGrid3
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
   const controlsRef = useRef<OrbitControls | null>(null)
+  const blocksGroupRef = useRef<THREE.Group | null>(null)
   const blockMeshesRef = useRef<Map<string, THREE.Mesh>>(new Map())
   const raycasterRef = useRef<THREE.Raycaster>(new THREE.Raycaster())
   const mouseRef = useRef<THREE.Vector2>(new THREE.Vector2())
+  const onBlockSelectRef = useRef(onBlockSelect)
+
+  // Atualizar ref quando onBlockSelect mudar
+  useEffect(() => {
+    onBlockSelectRef.current = onBlockSelect
+  }, [onBlockSelect])
 
   useEffect(() => {
     if (!containerRef.current) return
+
+    // Limpar qualquer canvas anterior do container
+    while (containerRef.current.firstChild) {
+      containerRef.current.removeChild(containerRef.current.firstChild)
+    }
 
     // Setup Scene
     const scene = new THREE.Scene()
@@ -60,6 +72,11 @@ export function BlockGrid3D({ blocks, onBlockSelect, selectedBlock }: BlockGrid3
     controls.dampingFactor = 0.05
     controlsRef.current = controls
 
+    // Create Blocks Group
+    const blocksGroup = new THREE.Group()
+    scene.add(blocksGroup)
+    blocksGroupRef.current = blocksGroup
+
     // Create Blocks
     const blockSize = 0.9
     const blockGeometry = new THREE.BoxGeometry(blockSize, 0.3, blockSize)
@@ -73,28 +90,28 @@ export function BlockGrid3D({ blocks, onBlockSelect, selectedBlock }: BlockGrid3
       mesh.position.set(block.x - 10, 0, block.y - 10)
 
       mesh.userData = { block }
-      scene.add(mesh)
+      blocksGroup.add(mesh)
       blockMeshesRef.current.set(`${block.x}-${block.y}`, mesh)
     })
 
     // Handle Click
     const handleClick = (event: MouseEvent) => {
-      if (!containerRef.current || !cameraRef.current || !sceneRef.current) return
+      if (!containerRef.current || !cameraRef.current || !blocksGroupRef.current) return
 
       const rect = containerRef.current.getBoundingClientRect()
       mouseRef.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
       mouseRef.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
 
       raycasterRef.current.setFromCamera(mouseRef.current, cameraRef.current)
-      const intersects = raycasterRef.current.intersectObjects(sceneRef.current.children)
+      const intersects = raycasterRef.current.intersectObjects(blocksGroupRef.current.children, false)
 
       if (intersects.length > 0) {
         const intersected = intersects[0].object as THREE.Mesh
         if (intersected.userData.block) {
-          onBlockSelect(intersected.userData.block)
+          onBlockSelectRef.current(intersected.userData.block)
         }
       } else {
-        onBlockSelect(null)
+        onBlockSelectRef.current(null)
       }
     }
 
@@ -123,10 +140,32 @@ export function BlockGrid3D({ blocks, onBlockSelect, selectedBlock }: BlockGrid3
     return () => {
       window.removeEventListener("resize", handleResize)
       renderer.domElement.removeEventListener("click", handleClick)
+      
+      // Limpar geometrias e materiais para evitar vazamento de memória
+      blockGeometry.dispose()
+      blocksGroup.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          child.geometry.dispose()
+          if (Array.isArray(child.material)) {
+            child.material.forEach(m => m.dispose())
+          } else {
+            child.material.dispose()
+          }
+        }
+      })
+      
+      // Limpar referências de meshes
+      blockMeshesRef.current.clear()
+      
+      // Dispose do renderer
       renderer.dispose()
-      containerRef.current?.removeChild(renderer.domElement)
+      
+      // Remover canvas do DOM apenas se ainda estiver no container
+      if (containerRef.current && renderer.domElement.parentNode === containerRef.current) {
+        containerRef.current.removeChild(renderer.domElement)
+      }
     }
-  }, [blocks, onBlockSelect])
+  }, [blocks])
 
   // Update selected block highlight
   useEffect(() => {
