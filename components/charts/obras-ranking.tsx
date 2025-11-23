@@ -164,3 +164,4 @@ export function ObrasRanking({ obras, title = "Ranking de Obras" }: ObrasRanking
   )
 }
 
+

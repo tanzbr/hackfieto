@@ -50,7 +50,7 @@ export function NotificationCenter({ isOpen, onClose }: NotificationCenterProps)
       />
 
       {/* Painel de notificações */}
-      <div className="fixed top-16 right-6 w-96 bg-white rounded-lg shadow-2xl border border-gray-200 z-50 max-h-[600px] flex flex-col">
+      <div className="fixed top-16 right-32 w-96 bg-white rounded-lg shadow-2xl border border-gray-200 z-50 max-h-[600px] flex flex-col">
         {/* Header */}
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center justify-between mb-3">

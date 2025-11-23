@@ -59,6 +59,9 @@ export function AppSidebar() {
   const [activeSection, setActiveSection] = useState("")
 
   useEffect(() => {
+    // Apenas executar no cliente
+    if (typeof window === 'undefined') return
+
     // Atualizar seção ativa baseado no hash da URL
     const updateActiveSection = () => {
       setActiveSection(window.location.hash)
@@ -70,7 +73,7 @@ export function AppSidebar() {
     return () => {
       window.removeEventListener("hashchange", updateActiveSection)
     }
-  }, [])
+  }, [pathname])
 
   const handleMenuClick = (e: React.MouseEvent, item: typeof menuItems.principal[0]) => {
     // Se estamos em uma sub-rota (ex: /obras/[id]), permite navegação normal para qualquer link
@@ -114,12 +117,16 @@ export function AppSidebar() {
     <Sidebar className="border-r-0">
       <SidebarHeader className="border-b border-white/10 bg-gradient-to-b from-slate-900/50 to-transparent">
         <div className="flex items-center gap-3 px-4 py-2">
-          <div className="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center text-white font-bold text-xl border border-slate-700">
-            N
+          <div className="w-14 h-14 rounded-lg overflow-hidden flex items-center justify-center bg-transparent">
+            <img 
+              src="/logo-nexfloor.png" 
+              alt="Nexfloor Logo" 
+              className="w-full h-full object-contain"
+            />
           </div>
           <div className="flex flex-col">
-            <span className="text-xl font-semibold text-white tracking-tight">Nexfloor</span>
-            <span className="text-xs text-slate-500 font-normal">Sistema de Monitoramento</span>
+            <span className="text-lg font-semibold text-white tracking-tight">Nexfloor</span>
+            <span className="text-[11px] text-slate-500 font-normal">Sistema de Monitoramento</span>
           </div>
         </div>
       </SidebarHeader>
@@ -133,7 +140,9 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1">
               {menuItems.principal.map((item) => {
-                const isActive = pathname === item.url && item.url !== "#" && activeSection === item.hash
+                const isActive = item.hash 
+                  ? pathname === item.url && activeSection === item.hash
+                  : pathname === item.url && activeSection === ""
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
@@ -174,7 +183,9 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1">
               {menuItems.sistema.map((item) => {
-                const isActive = pathname === item.url && item.url !== "#" && activeSection === item.hash
+                const isActive = item.hash 
+                  ? pathname === item.url && activeSection === item.hash
+                  : pathname === item.url && activeSection === ""
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
