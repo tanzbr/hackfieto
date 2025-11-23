@@ -202,7 +202,7 @@ export default function ObraDetailPage({ params }: { params: Promise<{ id: strin
           </div>
 
           {/* Mapa de Calor */}
-          <Heatmap blocks={blocks} />
+          <Heatmap blocks={blocks} onBlockSelect={setSelectedBlock} />
         </div>
       </main>
     </div>
