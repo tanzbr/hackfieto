@@ -43,6 +43,18 @@ export interface Event {
   user?: string
 }
 
+export interface AIInsight {
+  id: string
+  blockPosition: { x: number; y: number }
+  title: string
+  description: string
+  severity: "critical" | "warning" | "info"
+  metrics: {
+    label: string
+    value: string
+  }[]
+}
+
 // Gera uma grade de blocos com integridades aleatórias
 export function generateBlockGrid(size = 10): Block[] {
   const blocks: Block[] = []
@@ -318,4 +330,72 @@ export function getEventsForObra(obraId: string): Event[] {
 
 export function getUnreadNotificationsCount(): number {
   return mockNotifications.filter(n => !n.read).length
+}
+
+// Mock de insights de IA por obra
+const aiInsightsCache: { [key: string]: AIInsight[] } = {}
+
+export function getAIInsightsForObra(obraId: string): AIInsight[] {
+  if (!aiInsightsCache[obraId]) {
+    const blocks = getBlocksForObra(obraId)
+    
+    // Encontrar blocos com problemas para gerar insights
+    const criticalBlocks = blocks.filter(b => b.integrity < 40)
+    const warningBlocks = blocks.filter(b => b.integrity >= 40 && b.integrity < 70)
+    
+    const insights: AIInsight[] = []
+    
+    // Insight 1: Bloco crítico com desgaste acelerado
+    if (criticalBlocks.length > 0) {
+      const block = criticalBlocks[0]
+      insights.push({
+        id: `${obraId}-insight-1`,
+        blockPosition: { x: block.x, y: block.y },
+        title: "Desgaste Acelerado Detectado",
+        description: "Este bloco apresenta velocidade de desgaste 30% acima do normal nos últimos 7 dias.",
+        severity: "critical",
+        metrics: [
+          { label: "Integridade Atual", value: `${block.integrity}%` },
+          { label: "Velocidade de Desgaste", value: "+30%" },
+          { label: "Tempo Estimado", value: "15 dias" }
+        ]
+      })
+    }
+    
+    // Insight 2: Área com uso excessivo
+    if (warningBlocks.length > 0) {
+      const block = warningBlocks[Math.floor(warningBlocks.length / 2)]
+      insights.push({
+        id: `${obraId}-insight-2`,
+        blockPosition: { x: block.x, y: block.y },
+        title: "Uso Excessivo nos Últimos 3 Dias",
+        description: "Tráfego intenso detectado nesta área. Recomenda-se redistribuição de carga.",
+        severity: "warning",
+        metrics: [
+          { label: "Integridade Atual", value: `${block.integrity}%` },
+          { label: "Pico de Tráfego", value: "2.3x normal" },
+          { label: "Dias Consecutivos", value: "3 dias" }
+        ]
+      })
+    }
+    
+    // Insight 3: Manutenção preventiva recomendada
+    const middleBlock = blocks.find(b => b.x === 5 && b.y === 5) || blocks[blocks.length - 1]
+    insights.push({
+      id: `${obraId}-insight-3`,
+      blockPosition: { x: middleBlock.x, y: middleBlock.y },
+      title: "Manutenção Preventiva Recomendada",
+      description: "Setor apresenta padrão de desgaste irregular. Inspeção detalhada recomendada.",
+      severity: middleBlock.integrity < 50 ? "critical" : "info",
+      metrics: [
+        { label: "Integridade Média", value: `${middleBlock.integrity}%` },
+        { label: "Blocos Afetados", value: "8 blocos" },
+        { label: "Prioridade", value: "Média" }
+      ]
+    })
+    
+    aiInsightsCache[obraId] = insights
+  }
+  
+  return aiInsightsCache[obraId]
 }

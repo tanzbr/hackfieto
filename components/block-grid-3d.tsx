@@ -1,20 +1,26 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import * as THREE from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
-import { type Block } from "@/lib/mock-data"
+import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js"
+import { type Block, type AIInsight } from "@/lib/mock-data"
 
 interface BlockGrid3DProps {
   blocks: Block[]
   onBlockSelect: (block: Block | null) => void
   selectedBlock: Block | null
+  aiInsights?: AIInsight[]
+  showInsights?: boolean
+  isLoadingInsights?: boolean
+  onCloseInsights?: () => void
 }
 
-export function BlockGrid3D({ blocks, onBlockSelect, selectedBlock }: BlockGrid3DProps) {
+export function BlockGrid3D({ blocks, onBlockSelect, selectedBlock, aiInsights, showInsights, isLoadingInsights, onCloseInsights }: BlockGrid3DProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<THREE.Scene | null>(null)
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
+  const labelRendererRef = useRef<CSS2DRenderer | null>(null)
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
   const controlsRef = useRef<OrbitControls | null>(null)
   const blocksGroupRef = useRef<THREE.Group | null>(null)
@@ -22,11 +28,151 @@ export function BlockGrid3D({ blocks, onBlockSelect, selectedBlock }: BlockGrid3
   const raycasterRef = useRef<THREE.Raycaster>(new THREE.Raycaster())
   const mouseRef = useRef<THREE.Vector2>(new THREE.Vector2())
   const onBlockSelectRef = useRef(onBlockSelect)
+  const insightObjectsRef = useRef<CSS2DObject[]>([])
+  const insightLinesRef = useRef<THREE.Line[]>([])
+  const [currentInsightIndex, setCurrentInsightIndex] = useState(0)
+  const animationFrameRef = useRef<number | null>(null)
+  const cameraAnimationRef = useRef<{
+    startPos: THREE.Vector3
+    startLookAt: THREE.Vector3
+    targetPos: THREE.Vector3
+    targetLookAt: THREE.Vector3
+    progress: number
+    isAnimating: boolean
+  } | null>(null)
 
   // Atualizar ref quando onBlockSelect mudar
   useEffect(() => {
     onBlockSelectRef.current = onBlockSelect
   }, [onBlockSelect])
+
+  // Função para criar popup de insight como HTML overlay 3D
+  const createInsightPopup3D = (insight: AIInsight, scene: THREE.Scene): CSS2DObject => {
+    const insightDiv = document.createElement('div')
+    insightDiv.className = 'insight-popup'
+    insightDiv.style.cssText = `
+      background: white;
+      border-radius: 10px;
+      padding: 12px;
+      min-width: 220px;
+      max-width: 260px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+      border: 2px solid ${insight.severity === 'critical' ? '#ef4444' : insight.severity === 'warning' ? '#f59e0b' : '#3b82f6'};
+      pointer-events: auto;
+      font-family: system-ui, -apple-system, sans-serif;
+    `
+
+    const severityColors = {
+      critical: '#ef4444',
+      warning: '#f59e0b',
+      info: '#3b82f6'
+    }
+
+    const severityLabels = {
+      critical: 'Crítico',
+      warning: 'Alerta',
+      info: 'Informação'
+    }
+
+    insightDiv.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
+        <div style="width: 6px; height: 6px; border-radius: 50%; background: ${severityColors[insight.severity]}; flex-shrink: 0;"></div>
+        <span style="font-size: 10px; font-weight: 600; color: ${severityColors[insight.severity]}; text-transform: uppercase; letter-spacing: 0.5px;">
+          ${severityLabels[insight.severity]}
+        </span>
+      </div>
+      <h3 style="margin: 0 0 6px 0; font-size: 13px; font-weight: 700; color: #1f2937; line-height: 1.3;">
+        ${insight.title}
+      </h3>
+      <p style="margin: 0 0 12px 0; font-size: 11px; color: #6b7280; line-height: 1.4;">
+        ${insight.description}
+      </p>
+      <div style="display: grid; gap: 6px;">
+        ${insight.metrics.map(metric => `
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: #f9fafb; border-radius: 6px;">
+            <span style="font-size: 10px; color: #6b7280; font-weight: 500;">${metric.label}</span>
+            <span style="font-size: 11px; color: #111827; font-weight: 700;">${metric.value}</span>
+          </div>
+        `).join('')}
+      </div>
+    `
+
+    const label = new CSS2DObject(insightDiv)
+    
+    // Posicionar o popup mais elevado e ao lado do bloco
+    const posX = (insight.blockPosition.x - 4.5) * 16
+    const posZ = (insight.blockPosition.y - 4.5) * 16
+    label.position.set(posX + 20, 35, posZ)
+    
+    scene.add(label)
+    return label
+  }
+
+  // Função para criar linha conectando popup ao bloco
+  const createArrowToBlock = (insight: AIInsight, scene: THREE.Scene): THREE.Line => {
+    const posX = (insight.blockPosition.x - 4.5) * 16
+    const posZ = (insight.blockPosition.y - 4.5) * 16
+    
+    const points = []
+    points.push(new THREE.Vector3(posX + 20, 30, posZ)) // Base do popup (mais alto)
+    points.push(new THREE.Vector3(posX + 10, 18, posZ)) // Ponto intermediário
+    points.push(new THREE.Vector3(posX + 3, 8, posZ))   // Mais próximo do bloco
+    points.push(new THREE.Vector3(posX, 1, posZ))       // Bloco (bem próximo ao chão)
+    
+    const geometry = new THREE.BufferGeometry().setFromPoints(points)
+    
+    const severityColors = {
+      critical: 0xef4444,
+      warning: 0xf59e0b,
+      info: 0x3b82f6
+    }
+    
+    const material = new THREE.LineBasicMaterial({
+      color: severityColors[insight.severity],
+      linewidth: 4,
+      transparent: true,
+      opacity: 0.9
+    })
+    
+    const line = new THREE.Line(geometry, material)
+    scene.add(line)
+    
+    // Adicionar uma seta no final da linha apontando para o bloco
+    const arrowGeometry = new THREE.ConeGeometry(1.5, 3, 8)
+    const arrowMaterial = new THREE.MeshBasicMaterial({
+      color: severityColors[insight.severity],
+      transparent: true,
+      opacity: 0.9
+    })
+    const arrow = new THREE.Mesh(arrowGeometry, arrowMaterial)
+    arrow.position.set(posX, 2.5, posZ)
+    arrow.rotation.x = Math.PI // Apontar para baixo
+    scene.add(arrow)
+    
+    // Guardar referência da seta para limpeza
+    line.userData.arrow = arrow
+    
+    return line
+  }
+
+  // Função para animar câmera suavemente
+  const animateCameraToInsight = (insight: AIInsight, camera: THREE.PerspectiveCamera, controls: OrbitControls) => {
+    const posX = (insight.blockPosition.x - 4.5) * 16
+    const posZ = (insight.blockPosition.y - 4.5) * 16
+    
+    const targetLookAt = new THREE.Vector3(posX, 10, posZ) // Olhar um pouco acima para ver o card
+    const offset = new THREE.Vector3(60, 45, 60) // Câmera mais afastada (menos zoom)
+    const targetPos = new THREE.Vector3().copy(targetLookAt).add(offset)
+    
+    cameraAnimationRef.current = {
+      startPos: camera.position.clone(),
+      startLookAt: controls.target.clone(),
+      targetPos: targetPos,
+      targetLookAt: targetLookAt,
+      progress: 0,
+      isAnimating: true
+    }
+  }
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -59,6 +205,15 @@ export function BlockGrid3D({ blocks, onBlockSelect, selectedBlock }: BlockGrid3
     renderer.shadowMap.type = THREE.PCFSoftShadowMap
     containerRef.current.appendChild(renderer.domElement)
     rendererRef.current = renderer
+
+    // Setup CSS2D Renderer para labels HTML
+    const labelRenderer = new CSS2DRenderer()
+    labelRenderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight)
+    labelRenderer.domElement.style.position = 'absolute'
+    labelRenderer.domElement.style.top = '0'
+    labelRenderer.domElement.style.pointerEvents = 'none'
+    containerRef.current.appendChild(labelRenderer.domElement)
+    labelRendererRef.current = labelRenderer
 
     // Setup Lights - Iluminação industrial
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6)
@@ -183,60 +338,6 @@ export function BlockGrid3D({ blocks, onBlockSelect, selectedBlock }: BlockGrid3
     divider3.position.set(40, wallHeight * 0.4, -30)
     scene.add(divider3)
 
-    // Criar janelas ocas (apenas molduras)
-    const windowFrameMaterial = new THREE.LineBasicMaterial({
-      color: 0x1f2937,
-      linewidth: 2,
-    })
-
-    const createWindowFrame = (width: number, height: number, x: number, y: number, z: number, rotateY = 0) => {
-      // Criar retângulo para moldura da janela
-      const points = []
-      const hw = width / 2
-      const hh = height / 2
-      
-      points.push(new THREE.Vector3(-hw, -hh, 0))
-      points.push(new THREE.Vector3(hw, -hh, 0))
-      points.push(new THREE.Vector3(hw, hh, 0))
-      points.push(new THREE.Vector3(-hw, hh, 0))
-      points.push(new THREE.Vector3(-hw, -hh, 0))
-      
-      const geometry = new THREE.BufferGeometry().setFromPoints(points)
-      const frame = new THREE.Line(geometry, windowFrameMaterial)
-      frame.position.set(x, y, z)
-      frame.rotation.y = rotateY
-      
-      // Adicionar divisões internas (cruz)
-      const divPoints = []
-      divPoints.push(new THREE.Vector3(-hw, 0, 0))
-      divPoints.push(new THREE.Vector3(hw, 0, 0))
-      const divGeometry1 = new THREE.BufferGeometry().setFromPoints(divPoints)
-      const divLine1 = new THREE.Line(divGeometry1, windowFrameMaterial)
-      divLine1.position.copy(frame.position)
-      divLine1.rotation.copy(frame.rotation)
-      
-      const divPoints2 = []
-      divPoints2.push(new THREE.Vector3(0, -hh, 0))
-      divPoints2.push(new THREE.Vector3(0, hh, 0))
-      const divGeometry2 = new THREE.BufferGeometry().setFromPoints(divPoints2)
-      const divLine2 = new THREE.Line(divGeometry2, windowFrameMaterial)
-      divLine2.position.copy(frame.position)
-      divLine2.rotation.copy(frame.rotation)
-      
-      return [frame, divLine1, divLine2]
-    }
-
-    // Janelas na parede norte
-    for (let i = -3; i <= 3; i++) {
-      const windows = createWindowFrame(8, 12, i * 20, 15, -80.5)
-      windows.forEach(w => scene.add(w))
-    }
-
-    // Janelas na parede leste
-    for (let i = -3; i <= 3; i++) {
-      const windows = createWindowFrame(8, 12, 80.5, 15, i * 20, Math.PI / 2)
-      windows.forEach(w => scene.add(w))
-    }
 
     // Base/chão com textura industrial (160x160 para corresponder ao grid de blocos)
     const floorGeometry = new THREE.PlaneGeometry(buildingSize, buildingSize)
@@ -576,8 +677,33 @@ export function BlockGrid3D({ blocks, onBlockSelect, selectedBlock }: BlockGrid3
         }
       })
       
-      controls.update()
+      // Animar câmera se houver animação em progresso
+      if (cameraAnimationRef.current?.isAnimating) {
+        const anim = cameraAnimationRef.current
+        anim.progress += 0.02 // Velocidade da animação
+        
+        if (anim.progress >= 1) {
+          // Animação completa
+          camera.position.copy(anim.targetPos)
+          controls.target.copy(anim.targetLookAt)
+          anim.isAnimating = false
+        } else {
+          // Interpolação suave (easing)
+          const t = 1 - Math.pow(1 - anim.progress, 3) // ease-out cubic
+          
+          camera.position.lerpVectors(anim.startPos, anim.targetPos, t)
+          controls.target.lerpVectors(anim.startLookAt, anim.targetLookAt, t)
+        }
+        
+        controls.update()
+      } else {
+        controls.update()
+      }
+      
       renderer.render(scene, camera)
+      if (labelRendererRef.current) {
+        labelRendererRef.current.render(scene, camera)
+      }
     }
     animate()
 
@@ -588,6 +714,10 @@ export function BlockGrid3D({ blocks, onBlockSelect, selectedBlock }: BlockGrid3
       cameraRef.current.aspect = containerRef.current.clientWidth / containerRef.current.clientHeight
       cameraRef.current.updateProjectionMatrix()
       rendererRef.current.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight)
+      
+      if (labelRendererRef.current) {
+        labelRendererRef.current.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight)
+      }
     }
 
     window.addEventListener("resize", handleResize)
@@ -603,7 +733,6 @@ export function BlockGrid3D({ blocks, onBlockSelect, selectedBlock }: BlockGrid3
       floorMaterial.dispose()
       wallMaterial.dispose()
       dividerMaterial.dispose()
-      windowFrameMaterial.dispose()
       equipmentMaterial.dispose()
       deskMaterial.dispose()
       doorFrameMaterial.dispose()
@@ -641,8 +770,67 @@ export function BlockGrid3D({ blocks, onBlockSelect, selectedBlock }: BlockGrid3
       if (containerRef.current && renderer.domElement.parentNode === containerRef.current) {
         containerRef.current.removeChild(renderer.domElement)
       }
+      
+      // Remover labelRenderer
+      if (containerRef.current && labelRenderer.domElement.parentNode === containerRef.current) {
+        containerRef.current.removeChild(labelRenderer.domElement)
+      }
     }
   }, [blocks])
+
+  // Gerenciar insights - mostrar/ocultar e animar câmera
+  useEffect(() => {
+    if (!sceneRef.current || !cameraRef.current || !controlsRef.current) return
+    
+    const scene = sceneRef.current
+    const camera = cameraRef.current
+    const controls = controlsRef.current
+    
+    // Limpar insights anteriores
+    insightObjectsRef.current.forEach(obj => {
+      scene.remove(obj)
+      obj.element.remove()
+    })
+    insightObjectsRef.current = []
+    
+    insightLinesRef.current.forEach(line => {
+      scene.remove(line)
+      line.geometry.dispose()
+      if (Array.isArray(line.material)) {
+        line.material.forEach(m => m.dispose())
+      } else {
+        line.material.dispose()
+      }
+      // Remover a seta associada
+      if (line.userData.arrow) {
+        scene.remove(line.userData.arrow)
+        line.userData.arrow.geometry.dispose()
+        if (Array.isArray(line.userData.arrow.material)) {
+          line.userData.arrow.material.forEach((m: THREE.Material) => m.dispose())
+        } else {
+          line.userData.arrow.material.dispose()
+        }
+      }
+    })
+    insightLinesRef.current = []
+    
+    // Se insights devem ser mostrados, mostrar apenas o insight atual
+    if (showInsights && aiInsights && aiInsights.length > 0) {
+      const currentInsight = aiInsights[currentInsightIndex]
+      
+      if (currentInsight) {
+        // Criar popup e linha apenas para o insight atual
+        const popup = createInsightPopup3D(currentInsight, scene)
+        const line = createArrowToBlock(currentInsight, scene)
+        
+        insightObjectsRef.current.push(popup)
+        insightLinesRef.current.push(line)
+        
+        // Animar câmera para o insight atual
+        animateCameraToInsight(currentInsight, camera, controls)
+      }
+    }
+  }, [showInsights, aiInsights, currentInsightIndex])
 
   // Update selected block highlight
   useEffect(() => {
@@ -660,5 +848,101 @@ export function BlockGrid3D({ blocks, onBlockSelect, selectedBlock }: BlockGrid3
     })
   }, [selectedBlock])
 
-  return <div ref={containerRef} className="w-full h-full" />
+  return (
+    <div ref={containerRef} className="w-full h-full relative">
+      {/* Loading de insights */}
+      {isLoadingInsights && (
+        <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm z-10">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-12 h-12 border-4 border-pink-200 border-t-pink-500 rounded-full animate-spin"></div>
+            <p className="text-sm font-medium text-gray-700">Analisando dados com IA...</p>
+          </div>
+        </div>
+      )}
+      
+      {/* Controles de navegação entre insights */}
+      {showInsights && aiInsights && aiInsights.length > 0 && !isLoadingInsights && (
+        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex items-center gap-3 bg-white rounded-full shadow-lg px-4 py-3 z-10">
+          <button
+            onClick={() => {
+              const newIndex = currentInsightIndex > 0 ? currentInsightIndex - 1 : aiInsights.length - 1
+              setCurrentInsightIndex(newIndex)
+              if (cameraRef.current && controlsRef.current) {
+                animateCameraToInsight(aiInsights[newIndex], cameraRef.current, controlsRef.current)
+              }
+            }}
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            aria-label="Insight anterior"
+          >
+            <svg className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-gray-900">
+              {currentInsightIndex + 1}
+            </span>
+            <span className="text-sm text-gray-500">/</span>
+            <span className="text-sm text-gray-500">
+              {aiInsights.length}
+            </span>
+          </div>
+          
+          <button
+            onClick={() => {
+              const newIndex = currentInsightIndex < aiInsights.length - 1 ? currentInsightIndex + 1 : 0
+              setCurrentInsightIndex(newIndex)
+              if (cameraRef.current && controlsRef.current) {
+                animateCameraToInsight(aiInsights[newIndex], cameraRef.current, controlsRef.current)
+              }
+            }}
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            aria-label="Próximo insight"
+          >
+            <svg className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+          
+          <div className="w-px h-6 bg-gray-300 mx-1"></div>
+          
+          <button
+            onClick={() => {
+              // Fechar insights completamente
+              if (insightObjectsRef.current) {
+                insightObjectsRef.current.forEach(obj => {
+                  if (sceneRef.current) sceneRef.current.remove(obj)
+                  obj.element.remove()
+                })
+                insightObjectsRef.current = []
+              }
+              if (insightLinesRef.current) {
+                insightLinesRef.current.forEach(line => {
+                  if (sceneRef.current) {
+                    sceneRef.current.remove(line)
+                    // Remover a seta associada
+                    if (line.userData.arrow) {
+                      sceneRef.current.remove(line.userData.arrow)
+                    }
+                  }
+                })
+                insightLinesRef.current = []
+              }
+              // Chamar callback para fechar no componente pai
+              if (onCloseInsights) {
+                onCloseInsights()
+              }
+            }}
+            className="p-2 hover:bg-red-50 rounded-full transition-colors text-red-600"
+            aria-label="Fechar insights"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
+    </div>
+  )
 }

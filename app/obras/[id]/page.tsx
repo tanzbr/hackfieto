@@ -1,20 +1,25 @@
 "use client"
 
 import { useState, use } from "react"
-import { mockObras, getBlocksForObra, getIntegrityHistoryForObra, type Block } from "@/lib/mock-data"
+import { mockObras, getBlocksForObra, getIntegrityHistoryForObra, getAIInsightsForObra, type Block } from "@/lib/mock-data"
 import { BlockGrid3D } from "@/components/block-grid-3d"
 import { SidebarCard, WorkInfo, BlockInfo } from "@/components/sidebar-card"
 import { AppHeader } from "@/components/app-header"
 import { IntegrityTimeline } from "@/components/charts/integrity-timeline"
 import { StatusDistribution } from "@/components/charts/status-distribution"
 import { Heatmap } from "@/components/charts/heatmap"
+import { PressureSeismograph } from "@/components/charts/pressure-seismograph"
 import { ExportButton } from "@/components/export-button"
 import { QuickActionsMenu } from "@/components/quick-actions-menu"
 import { notFound } from "next/navigation"
 import Link from "next/link"
+import { Sparkles } from "lucide-react"
 
 export default function ObraDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const [selectedBlock, setSelectedBlock] = useState<Block | null>(null)
+  const [showInsights, setShowInsights] = useState(false)
+  const [isLoadingInsights, setIsLoadingInsights] = useState(false)
+  const [aiInsights, setAiInsights] = useState<ReturnType<typeof getAIInsightsForObra>>([])
   const { id } = use(params)
 
   const obra = mockObras.find((o) => o.id === id)
@@ -25,6 +30,25 @@ export default function ObraDetailPage({ params }: { params: Promise<{ id: strin
 
   const blocks = getBlocksForObra(obra.id)
   const history = getIntegrityHistoryForObra(obra.id)
+
+  const handleInsightsClick = () => {
+    if (showInsights) {
+      // Se já está mostrando, fechar
+      setShowInsights(false)
+      setAiInsights([])
+    } else {
+      // Iniciar loading
+      setIsLoadingInsights(true)
+      
+      // Simular carregamento de 1.5s
+      setTimeout(() => {
+        const insights = getAIInsightsForObra(obra.id)
+        setAiInsights(insights)
+        setShowInsights(true)
+        setIsLoadingInsights(false)
+      }, 1500)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -82,14 +106,53 @@ export default function ObraDetailPage({ params }: { params: Promise<{ id: strin
           {/* Visualizações 3D e 2D */}
           <div className="grid grid-cols-3 gap-6">
             {/* Visualização 3D */}
-            <div className="col-span-2">
+            <div className="col-span-2 space-y-6">
               <div className="bg-white rounded-lg border border-gray-200 h-[600px] flex flex-col">
                 <div className="p-4 border-b border-gray-200">
-                  <h2 className="text-lg font-semibold text-gray-900">Visualização 3D</h2>
-                  <p className="text-sm text-gray-600 mt-1">Clique em um bloco para ver detalhes</p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-lg font-semibold text-gray-900">Visualização 3D</h2>
+                      <p className="text-sm text-gray-600 mt-1">Clique em um bloco para ver detalhes</p>
+                    </div>
+                    <button 
+                      onClick={handleInsightsClick}
+                      disabled={isLoadingInsights}
+                      className="flex items-center gap-2 px-4 py-2 bg-pink-500 hover:bg-pink-600 text-white font-semibold rounded-lg shadow-lg transition-all duration-200 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isLoadingInsights ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          <span>Analisando...</span>
+                        </>
+                      ) : showInsights ? (
+                        <>
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                          <span>Fechar Insights</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4" />
+                          <span>Insights de IA</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
                 <div className="flex-1 relative overflow-hidden">
-                  <BlockGrid3D blocks={blocks} onBlockSelect={setSelectedBlock} selectedBlock={selectedBlock} />
+                  <BlockGrid3D 
+                    blocks={blocks} 
+                    onBlockSelect={setSelectedBlock} 
+                    selectedBlock={selectedBlock}
+                    aiInsights={aiInsights}
+                    showInsights={showInsights}
+                    isLoadingInsights={isLoadingInsights}
+                    onCloseInsights={() => {
+                      setShowInsights(false)
+                      setAiInsights([])
+                    }}
+                  />
                 </div>
                 <div className="p-4 border-t border-gray-200 bg-gray-50">
                   <div className="flex items-center justify-between">
@@ -109,6 +172,9 @@ export default function ObraDetailPage({ params }: { params: Promise<{ id: strin
                   </div>
                 </div>
               </div>
+
+              {/* Gráfico de Pressão em Tempo Real */}
+              <PressureSeismograph selectedBlock={selectedBlock} />
             </div>
 
             {/* Sidebar com Cards */}

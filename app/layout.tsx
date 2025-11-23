@@ -16,7 +16,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" className="dark">
       <head>
         <title>Nexfloor - Sistema de Monitoramento de Integridade</title>
         <meta name="description" content="Plataforma integrada para monitoramento da integridade física e manutenção preventiva de pisos industriais com blocos inteligentes" />
