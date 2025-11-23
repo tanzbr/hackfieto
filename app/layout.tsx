@@ -21,10 +21,8 @@ export default function RootLayout({
         <title>Nexfloor - Sistema de Monitoramento de Integridade</title>
         <meta name="description" content="Plataforma integrada para monitoramento da integridade física e manutenção preventiva de pisos industriais com blocos inteligentes" />
         <meta name="generator" content="Next.js" />
-        <link rel="icon" href="/icon-light-32x32.png" media="(prefers-color-scheme: light)" />
-        <link rel="icon" href="/icon-dark-32x32.png" media="(prefers-color-scheme: dark)" />
-        <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-        <link rel="apple-touch-icon" href="/apple-icon.png" />
+        <link rel="icon" href="/logo-nexfloor.png" type="image/png" />
+        <link rel="apple-touch-icon" href="/logo-nexfloor.png" />
       </head>
       <body className={`font-sans antialiased`}>
         <SidebarProvider defaultOpen={true}>

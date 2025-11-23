@@ -1,8 +1,6 @@
 import { mockObras } from "@/lib/mock-data"
 import { DashboardHero } from "@/components/dashboard-hero"
 import { AppHeader } from "@/components/app-header"
-import { ObrasComparison } from "@/components/charts/obras-comparison"
-import { ObraComparison } from "@/components/obra-comparison"
 
 export default function ObrasPage() {
   return (
@@ -11,12 +9,6 @@ export default function ObrasPage() {
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-8 space-y-8">
         <DashboardHero obras={mockObras} />
-        
-        {/* Gráfico de comparação */}
-        <ObrasComparison obras={mockObras} />
-
-        {/* Comparador interativo de obras */}
-        <ObraComparison obras={mockObras} />
       </main>
 
       <footer className="bg-white border-t border-gray-200 mt-16">
