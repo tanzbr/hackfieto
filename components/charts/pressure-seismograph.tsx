@@ -14,87 +14,170 @@ interface PressureDataPoint {
   timestamp: string
 }
 
+interface WebSocketData {
+  sensorId: string
+  timestamps: string[]
+  valores: number[]
+  valoresNewtons: number[]
+  totalLeituras: number
+}
+
 export function PressureSeismograph({ selectedBlock }: PressureSeismographProps) {
   const [isClient, setIsClient] = useState(false)
   const [pressureData, setPressureData] = useState<PressureDataPoint[]>([])
-  const timeCounterRef = useRef(0)
-  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected')
+  const wsRef = useRef<WebSocket | null>(null)
+  const startTimeRef = useRef<number | null>(null)
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     setIsClient(true)
   }, [])
 
-  // Função para gerar valor de pressão realista com padrão ondulado
-  const generatePressureValue = (time: number, baseIntensity: number): number => {
-    // Onda senoidal principal (frequência baixa)
-    const mainWave = Math.sin(time * 0.3) * 15
-    
-    // Onda de alta frequência (simulando passos)
-    const highFreqWave = Math.sin(time * 2) * 8
-    
-    // Ruído aleatório pequeno
-    const noise = (Math.random() - 0.5) * 5
-    
-    // Picos ocasionais (simulando pessoas caminhando)
-    const spike = Math.random() > 0.85 ? Math.random() * 20 : 0
-    
-    // Valor base ajustado pela integridade do bloco
-    const baseValue = baseIntensity
-    
-    const totalPressure = baseValue + mainWave + highFreqWave + noise + spike
-    
-    // Limitar entre 0 e 100
-    return Math.max(0, Math.min(100, totalPressure))
+  // Função para converter valoresNewtons para kPa
+  // 1 Newton = 0.001 kPa (aproximação para pressão em área)
+  const newtonsToKPa = (newtons: number): number => {
+    // Assumindo área de contato padrão, convertendo para kPa
+    // Para simplificar, vamos usar os valores diretamente como kPa
+    // ou fazer conversão se necessário: newtons / 1000
+    return newtons / 10 // Ajuste conforme necessário
   }
 
-  // Inicializar dados quando um bloco é selecionado
+  // Função para calcular tempo relativo em segundos desde o início da conexão
+  const getRelativeTime = (timestamp: string): number => {
+    if (!startTimeRef.current) {
+      startTimeRef.current = new Date(timestamp).getTime()
+      return 0
+    }
+    const currentTime = new Date(timestamp).getTime()
+    return (currentTime - startTimeRef.current) / 1000 // Converter para segundos
+  }
+
+  // Processar dados recebidos do WebSocket
+  const processWebSocketData = (data: WebSocketData) => {
+    if (!data.timestamps || !data.valoresNewtons || data.timestamps.length === 0) {
+      return
+    }
+
+    setPressureData(prevData => {
+      // Criar novos pontos a partir dos dados recebidos
+      const newPoints: PressureDataPoint[] = data.timestamps.map((timestamp, index) => {
+        const relativeTime = getRelativeTime(timestamp)
+        const pressure = newtonsToKPa(data.valoresNewtons[index])
+        
+        return {
+          time: relativeTime,
+          pressure: pressure,
+          timestamp: timestamp
+        }
+      })
+
+      // Combinar com dados anteriores, evitando duplicatas por timestamp
+      const existingTimestamps = new Set(prevData.map(p => p.timestamp))
+      const uniqueNewPoints = newPoints.filter(p => !existingTimestamps.has(p.timestamp))
+      
+      const combined = [...prevData, ...uniqueNewPoints]
+      
+      // Manter apenas os últimos 30 segundos de dados
+      const now = startTimeRef.current ? (Date.now() - startTimeRef.current) / 1000 : 0
+      const filtered = combined.filter(point => {
+        return point.time >= (now - 30) // Últimos 30 segundos
+      })
+
+      // Ordenar por tempo para garantir ordem correta
+      return filtered.sort((a, b) => a.time - b.time)
+    })
+  }
+
+  // Gerenciar conexão WebSocket
   useEffect(() => {
     if (!selectedBlock) {
+      // Fechar conexão se houver
+      if (wsRef.current) {
+        wsRef.current.close()
+        wsRef.current = null
+      }
       setPressureData([])
-      timeCounterRef.current = 0
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-        intervalRef.current = null
+      setConnectionStatus('disconnected')
+      startTimeRef.current = null
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current)
+        reconnectTimeoutRef.current = null
       }
       return
     }
 
-    // Calcular intensidade base a partir da integridade (blocos com menor integridade têm mais variação)
-    const baseIntensity = 50 + (100 - selectedBlock.integrity) * 0.3
+    // Determinar sensorId baseado no bloco selecionado
+    // Por enquanto, usando o ID "1" como no exemplo, mas pode ser mapeado dinamicamente
+    const sensorId = "1" // Pode ser mapeado para selectedBlock.id ou similar
+    const wsUrl = `wss://aqualy.tanz.dev/ws/piezo/dados/${sensorId}`
 
-    // Gerar dados iniciais (últimos 30 pontos)
-    const initialData: PressureDataPoint[] = []
-    for (let i = -30; i <= 0; i++) {
-      initialData.push({
-        time: i,
-        pressure: generatePressureValue(i, baseIntensity),
-        timestamp: `${i}s`
-      })
-    }
-    setPressureData(initialData)
-    timeCounterRef.current = 1
+    setConnectionStatus('connecting')
 
-    // Atualizar dados a cada 1 segundo
-    intervalRef.current = setInterval(() => {
-      setPressureData(prevData => {
-        const newTime = timeCounterRef.current
-        const newPoint: PressureDataPoint = {
-          time: newTime,
-          pressure: generatePressureValue(newTime, baseIntensity),
-          timestamp: `${newTime}s`
+    const connectWebSocket = () => {
+      try {
+        const ws = new WebSocket(wsUrl)
+
+        ws.onopen = () => {
+          setConnectionStatus('connected')
+          setPressureData([]) // Limpar dados anteriores ao conectar
+          startTimeRef.current = null // Resetar tempo inicial (será definido no primeiro dado recebido)
+          if (reconnectTimeoutRef.current) {
+            clearTimeout(reconnectTimeoutRef.current)
+            reconnectTimeoutRef.current = null
+          }
         }
 
-        // Manter apenas os últimos 30 segundos (30 pontos a 1Hz)
-        const updatedData = [...prevData, newPoint].slice(-30)
-        timeCounterRef.current += 1
+        ws.onmessage = (event) => {
+          try {
+            const data: WebSocketData = JSON.parse(event.data)
+            processWebSocketData(data)
+          } catch (error) {
+            console.error('Erro ao processar dados do WebSocket:', error)
+          }
+        }
+
+        ws.onerror = (error) => {
+          console.error('Erro no WebSocket:', error)
+          setConnectionStatus('error')
+        }
+
+        ws.onclose = () => {
+          setConnectionStatus('disconnected')
+          wsRef.current = null
+          
+          // Tentar reconectar após 3 segundos se ainda houver um bloco selecionado
+          if (selectedBlock) {
+            reconnectTimeoutRef.current = setTimeout(() => {
+              connectWebSocket()
+            }, 3000)
+          }
+        }
+
+        wsRef.current = ws
+      } catch (error) {
+        console.error('Erro ao conectar WebSocket:', error)
+        setConnectionStatus('error')
         
-        return updatedData
-      })
-    }, 1000)
+        // Tentar reconectar após 3 segundos
+        if (selectedBlock) {
+          reconnectTimeoutRef.current = setTimeout(() => {
+            connectWebSocket()
+          }, 3000)
+        }
+      }
+    }
+
+    connectWebSocket()
 
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
+      if (wsRef.current) {
+        wsRef.current.close()
+        wsRef.current = null
+      }
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current)
+        reconnectTimeoutRef.current = null
       }
     }
   }, [selectedBlock])
@@ -113,7 +196,28 @@ export function PressureSeismograph({ selectedBlock }: PressureSeismographProps)
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <h3 className="text-lg font-semibold text-gray-900">Pressão em Tempo Real</h3>
-
+          {selectedBlock && isClient && (
+            <div className="flex items-center gap-2">
+              {connectionStatus === 'connected' && (
+                <div className="flex items-center gap-2 px-3 py-1 bg-green-50 rounded-full">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className="text-xs font-medium text-green-700">CONECTADO</span>
+                </div>
+              )}
+              {connectionStatus === 'connecting' && (
+                <div className="flex items-center gap-2 px-3 py-1 bg-yellow-50 rounded-full">
+                  <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+                  <span className="text-xs font-medium text-yellow-700">CONECTANDO...</span>
+                </div>
+              )}
+              {connectionStatus === 'error' && (
+                <div className="flex items-center gap-2 px-3 py-1 bg-red-50 rounded-full">
+                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                  <span className="text-xs font-medium text-red-700">ERRO DE CONEXÃO</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
         {selectedBlock && isClient && (
           <div className="flex items-center gap-6 text-sm">
@@ -169,15 +273,22 @@ export function PressureSeismograph({ selectedBlock }: PressureSeismographProps)
                 dataKey="time" 
                 stroke="#6b7280"
                 style={{ fontSize: '11px' }}
-                tickFormatter={(value) => `${Math.round(value)}s`}
+                tickFormatter={(value) => {
+                  const seconds = Math.round(value)
+                  if (seconds < 0) return `${seconds}s`
+                  if (seconds < 60) return `${seconds}s`
+                  const minutes = Math.floor(seconds / 60)
+                  const secs = seconds % 60
+                  return `${minutes}m ${secs}s`
+                }}
                 interval="preserveEnd"
-                tick={{ fill: '#6b7280' }}
+                tick={false}
+                axisLine={false}
               />
               <YAxis 
                 stroke="#6b7280"
                 style={{ fontSize: '11px' }}
-                domain={[0, 100]}
-                ticks={[0, 25, 50, 75, 100]}
+                domain={['auto', 'auto']}
                 tick={{ fill: '#6b7280' }}
                 label={{ 
                   value: 'Pressão (kPa)', 
@@ -194,7 +305,13 @@ export function PressureSeismograph({ selectedBlock }: PressureSeismographProps)
                   padding: '8px 12px'
                 }}
                 formatter={(value: number) => [`${value.toFixed(2)} kPa`, 'Pressão']}
-                labelFormatter={(label) => `Tempo: ${parseFloat(label).toFixed(1)}s`}
+                labelFormatter={(label, payload) => {
+                  if (payload && payload[0]?.payload?.timestamp) {
+                    const date = new Date(payload[0].payload.timestamp)
+                    return `Tempo: ${date.toLocaleTimeString('pt-BR')}`
+                  }
+                  return `Tempo: ${parseFloat(label).toFixed(1)}s`
+                }}
               />
               <Line 
                 type="monotone" 
@@ -210,7 +327,21 @@ export function PressureSeismograph({ selectedBlock }: PressureSeismographProps)
           <div className="mt-3 pt-3 border-t border-gray-200">
             <div className="flex items-center justify-between text-xs text-gray-500">
               <span>Monitoramento contínuo via sensor piezoelétrico</span>
-              <span>Atualização: 1Hz (1s)</span>
+              <div className="flex items-center gap-4">
+                {connectionStatus === 'connected' && (
+                  <span className="text-green-600">Recebendo dados do backend (1s)</span>
+                )}
+                {connectionStatus === 'connecting' && (
+                  <span className="text-yellow-600">Conectando ao servidor...</span>
+                )}
+                {connectionStatus === 'error' && (
+                  <span className="text-red-600">Tentando reconectar...</span>
+                )}
+                <span>Sensor ID: {selectedBlock ? '1' : '-'}</span>
+                {pressureData.length > 0 && (
+                  <span>Pontos: {pressureData.length}</span>
+                )}
+              </div>
             </div>
           </div>
         </>
