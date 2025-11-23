@@ -72,9 +72,32 @@ export function generateBlockGrid(size = 10): Block[] {
   return blocks
 }
 
-// Retorna cor baseada na integridade
+// Retorna cor baseada na integridade com gradiente
 export function getBlockColor(integrity: number): string {
-  return "#ffffff" // branco - todos os blocos são brancos
+  // Verde (≥70%): variação de #86efac (70%) até #22c55e (100%)
+  if (integrity >= 70) {
+    const ratio = (integrity - 70) / 30 // 0 a 1
+    const r = Math.round(134 + (34 - 134) * ratio)
+    const g = Math.round(239 + (197 - 239) * ratio)
+    const b = Math.round(172 + (94 - 172) * ratio)
+    return `rgb(${r}, ${g}, ${b})`
+  }
+  
+  // Amarelo (40-69%): variação de #fcd34d (40%) até #f59e0b (69%)
+  if (integrity >= 40) {
+    const ratio = (integrity - 40) / 29 // 0 a 1
+    const r = Math.round(252 + (245 - 252) * ratio)
+    const g = Math.round(211 + (158 - 211) * ratio)
+    const b = Math.round(77 + (11 - 77) * ratio)
+    return `rgb(${r}, ${g}, ${b})`
+  }
+  
+  // Vermelho (<40%): variação de #fca5a5 (20%) até #dc2626 (39%)
+  const ratio = Math.max(0, (integrity - 20) / 19) // 0 a 1
+  const r = Math.round(252 + (220 - 252) * ratio)
+  const g = Math.round(165 + (38 - 165) * ratio)
+  const b = Math.round(165 + (38 - 165) * ratio)
+  return `rgb(${r}, ${g}, ${b})`
 }
 
 // Retorna cor do círculo de integridade baseado na integridade

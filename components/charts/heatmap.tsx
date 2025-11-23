@@ -7,9 +7,10 @@ interface HeatmapProps {
   blocks: Block[]
   title?: string
   size?: number
+  onBlockSelect?: (block: Block | null) => void
 }
 
-export function Heatmap({ blocks, title = "Mapa de Calor - Integridade dos Blocos", size = 10 }: HeatmapProps) {
+export function Heatmap({ blocks, title = "Mapa de Calor - Integridade dos Blocos", size = 10, onBlockSelect }: HeatmapProps) {
   const [hoveredBlock, setHoveredBlock] = useState<Block | null>(null)
   const [isClient, setIsClient] = useState(false)
   
@@ -53,6 +54,7 @@ export function Heatmap({ blocks, title = "Mapa de Calor - Integridade dos Bloco
                       }}
                       onMouseEnter={() => block && setHoveredBlock(block)}
                       onMouseLeave={() => setHoveredBlock(null)}
+                      onClick={() => block && onBlockSelect?.(block)}
                     />
                   ))}
                 </div>
@@ -88,15 +90,15 @@ export function Heatmap({ blocks, title = "Mapa de Calor - Integridade dos Bloco
               <h4 className="text-sm font-medium text-gray-700 mb-2">Legenda</h4>
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded border border-gray-300" style={{ backgroundColor: '#ffffff' }} />
+                  <div className="w-6 h-6 rounded border border-gray-300" style={{ backgroundColor: '#22c55e' }} />
                   <span className="text-sm text-gray-600">Bom (≥70%)</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded border border-gray-300" style={{ backgroundColor: '#fbbf24' }} />
+                  <div className="w-6 h-6 rounded border border-gray-300" style={{ backgroundColor: '#f59e0b' }} />
                   <span className="text-sm text-gray-600">Alerta (40-69%)</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded border border-gray-300" style={{ backgroundColor: '#ef4444' }} />
+                  <div className="w-6 h-6 rounded border border-gray-300" style={{ backgroundColor: '#dc2626' }} />
                   <span className="text-sm text-gray-600">Crítico (&lt;40%)</span>
                 </div>
               </div>
